@@ -1,5 +1,4 @@
 Require Import Coq.micromega.Lia.
-Require Import Coq.omega.Omega.
 Require Import Coq.NArith.BinNat.
 Require Import Coq.btauto.Btauto.
 Require Import Coq.Lists.List.
@@ -133,10 +132,15 @@ Fixpoint to_cnf' (n : var) (f : dm_formula) : var * cnf_formula :=
                  ((n'' + 1)%N, f')
   end.
 
+Definition lit_var (l : literal) : var :=
+  match l with
+  | PosLit v => v
+  | NegLit v => v
+  end.
+
 Fixpoint dm_max_var (f : dm_formula) : var :=
   match f with
-  | DMLit (PosLit v) => v
-  | DMLit (NegLit v) => v
+  | DMLit l => lit_var l
   | DMAnd f1 f2 => N.max (dm_max_var f1) (dm_max_var f2)
   | DMOr f1 f2 => N.max (dm_max_var f1) (dm_max_var f2)
   end.
@@ -144,8 +148,7 @@ Fixpoint dm_max_var (f : dm_formula) : var :=
 Fixpoint clause_max_var (c : clause) : var :=
   match c with
   | [] => 0%N
-  | (PosLit v) :: c' => N.max v (clause_max_var c')
-  | (NegLit v) :: c' => N.max v (clause_max_var c')
+  | l :: c' => N.max (lit_var l) (clause_max_var c')
   end.
 
 Fixpoint cnf_max_var (f : cnf_formula) : var :=
@@ -180,17 +183,10 @@ Qed.
 
 Open Scope N_scope.
 
-Definition lit_var (l : literal) : var :=
-  match l with
-  | PosLit v => v
-  | NegLit v => v
-  end.
-
 Lemma cnf_max_var_add_lit_to_clauses : forall l f,
     cnf_max_var (add_lit_to_clauses l f) <= N.max (lit_var l) (cnf_max_var f).
 Proof.
-  induction f; cbn; try lia.
-  destruct l; cbn in *; lia.
+  induction f; cbn; lia.
 Qed.
 
 Lemma cnf_max_var_add_lit_to_clauses' : forall l f,
@@ -248,7 +244,7 @@ Lemma satisfies_dm_subst : forall a a' f,
     satisfies_dm a f = satisfies_dm a' f.
 Proof.
   induction f; cbn; intros.
-  - destruct l; cbn; firstorder.
+  - destruct l; cbn in *; firstorder.
     rewrite H; auto || lia.
   - rewrite IHf1, IHf2; auto;
       intros; apply H; lia.
@@ -483,4 +479,3 @@ Proof.
   - apply demorgans_correct_2.
   - apply to_cnf_correct.
 Qed.
-
