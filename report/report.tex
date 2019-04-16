@@ -1,0 +1,135 @@
+\documentclass{article}
+
+\usepackage{biblatex}
+\addbibresource{bibliography.bib}
+
+\title{6.892 Project Report: Formal Proofs of NP-Hardness}
+\author{John Grosen and Lily Chung}
+\date{15 April 2019}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+
+Throughout this course, we have been doing various proofs of NP-hardness, or of
+PSPACE-hardness, or hardness with respect to some other class. All of these
+proofs, though, have been on whiteboards, in conversation, on Coauthor, or on
+``pen and paper'' -- that is, they are \emph{informal} proofs. This is not say
+they are proof sketches -- the point is that they contain enough detail for a
+human to verify with reasonable confidence. However, informal proofs have their
+faults -- for example, it has been mentioned a couple times that a result stated
+in the lecture videos actually had a bug in the proof, usually small and easily
+fixable, but not always.
+
+For this reason (...along with our own personal interests...), we have been
+thinking about writing proofs of complexity results \emph{formally} -- that is,
+proofs written in a formal system that can be verified by a computer. This can
+provide greater guarantees that a proof is correct, at the expense of a lot more
+work writing the proof.
+
+The goal of this project, then, is to write a library in Coq for proving that
+certain problems are NP-hard, and then prove some problems to be NP-hard. We
+suppose this is closest to an ``implementation'' type of project.
+
+\section{Related Work}
+
+To our surprise, we were not able to find any existing work on formal proofs of
+complexity results. Thus, there are three main categories of related works:
+informal complexity proofs, formal proofs of correctness, and formal proofs of
+polytimeness.
+
+For the first category, given our initially simple goals, we focus primarily on
+the two fundamental works of NP-hardness. In 1971, Cook proved that CNF-SAT (and
+thus SAT) is NP-hard~\cite{cook1971}. The next year, Karp built on Cook's work
+to demonstrate the NP-hardness of a smattering of classic
+problems~\cite{karp1972}.
+
+The idea of formally proving mathematical theorems has been in vogue for a while
+now, with a few famous results, such as a formal proof of the four color
+theorem~\cite{gonthier2008}. We use the proof assistant Coq for our
+formalization~\cite{coq2019}.
+
+We see four primary approaches to formally proving polytimeness:
+\begin{enumerate}
+\item Use a language that limits you to explicitly the polytime functions.
+  Apparently Bellantoni and Cook gave a \emph{fully syntactic} characterization
+  of polytime functions~\cite{recursion92} -- super cool! In particular, it has
+  soundness (every syntactically valid program executes in polytime) and
+  \emph{extensional} completeness (for every function problem which can be
+  solved in polytime, there exists a syntactically valid program that computes
+  that function). Heraud and Nowak formalized it in Coq~\cite{formalization11}.
+  However, it's apparently extremely hard to write actual programs in -- and, we
+  imagine, verify programs in. So probably not what we're looking for.
+
+\item In the same vein, there's restrictions on term rewriting systems that
+  gives you polytime-ness. In particular, there's one that uses
+  "quasi-interpretations"~\cite{quasi11}, as formalized in Coq by some of the
+  same folks as before~\cite{formal18}. This seems a good bit nicer, though
+  still not terribly easy to use -- they proved the polytime-ness and
+  correctness of binary addition in about ~300 fairly simple-looking lines of
+  Coq, and of modular exponentiation in about ~1000 lines. However, this (from
+  the formalization paper) scares me: "Indeed, there may be a program prog1
+  [...] with a QI interpretation, but which can’t be extended with a program
+  prog2 defined on top of it [...] such that a QI can be found, in which case
+  prog1, or at least its QI, has to be modified." Given that a lot of reductions
+  reduce most easily from problems other than SAT known to be NP-hard, we want
+  some sort of transitivity -- e.g., if we know there's a reduction from SAT to
+  3SAT and a reduction from 3SAT to problem A, we know there's a reduction from
+  SAT to problem A. However, this warning of non-compositionality makes me worry
+  that such a property might be impossible to prove.
+
+\item There are operational semantics for use with deeply embedded languages
+  which instrument execution with a time cost. These have the unfortunate
+  downside (as best we can tell) that they don't have any direct connection to
+  running time on Turing machines, unlike the previous approaches, which are
+  proven (at least on paper) to be equivalent to the class of polytime function
+  problems. There seem to be three approaches to using these: directly, with
+  some sort of Hoare logic, or with a type system. For small examples, maybe
+  just directly inverting a bigstep relation might work. But for larger
+  programs, some people have used Hoare logics; the example of this that we're
+  aware of is by Charguéraud and Pottier, who used a separation logic with time
+  credits to prove amortized complexity of some ML programs~\cite{machine15}.
+  The proofs look pretty nasty though. The alternate approach is through the
+  type system; the example we know of here is TiML~\cite{timl17}, a project from
+  a former student in our lab, which is much much nicer to use, but currently
+  isn't really set up to do proofs about the programs in Coq. However, it's
+  worth noting that with both of these, the goal is typically to prove some time
+  bound much finer-grained than just polytime.
+
+\item Finally, there are axiomatic cost models of shallowly-embedded languages
+  in coq, such as the model included as part of the Foundational Cryptography
+  Framework~\cite{fcf15}. These have the least connection to the underlying
+  complexity theory, but tend to be the easiest to use, and have been used to
+  model polynomially-bounded adversaries in formal cryptographic settings. They
+  allow the use of normal Coq definitions, meaning they are easy to reason about
+  using the built-in tools of Coq.
+\end{enumerate}
+
+Although the first two options are perhaps the most theoretically sound, we
+intend to go with either option 3 or 4, considering the limited time available
+for a class project.
+
+\section{Milestones}
+
+\begin{enumerate}
+\item Get a reasonable definition of NP-hard written down, based on the approach
+  described above.
+\item Prove 3-SAT to be NP-hard.
+\item Prove some puzzle to be NP-hard from 3-SAT.
+\item lily help me out here
+\end{enumerate}
+
+If we manage to do all that, we could prove NP-hardness of more classic
+problems, or could prove PSPACE-hardness of some problems (since our technique
+is easily modifiable to this -- just swap out SAT for QSAT).
+
+\section{Authors}
+
+This is intended to be John's \emph{main} (and only) project. Lily is planning
+to make \emph{minor} contributions.
+
+\printbibliography
+
+\end{document}
