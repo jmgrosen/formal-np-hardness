@@ -28,6 +28,38 @@ Fixpoint from_many (cl : clause) (carry : var) : Fresh (list clause) :=
                  ret ([NegLit carry; aip2; PosLit xip1] :: rest)
   end.
 
+Definition clause_to_three (cl : clause) : Fresh (list clause) :=
+  match cl with
+  | [] => x <- fresh ;;
+         ret [ [PosLit x; PosLit x; PosLit x]; [NegLit x; NegLit x; NegLit x] ]
+  | [a] => x <- fresh ;;
+          y <- fresh ;;
+          ret [ [a; PosLit x; PosLit y]
+              ; [a; NegLit x; PosLit y]
+              ; [a; PosLit x; NegLit y]
+              ; [a; NegLit x; NegLit y]
+              ]
+  | [a; b] => x <- fresh ;;
+             ret [ [a; b; PosLit x]
+                 ; [a; b; NegLit x]
+                 ]
+  | [a; b; c] => ret [ [a; b; c] ]
+  | a :: b :: cl' => x1 <- fresh ;;
+                  many <- from_many cl' x1 ;;
+                  ret ([a; b; PosLit x1] :: many)
+  end.
+
+Fixpoint cnf_to_three'' (f : cnf_formula) : Fresh cnf_formula :=
+  match f with
+  | nil => ret nil
+  | cl :: f' => cl' <- clause_to_three cl ;;
+              f'' <- cnf_to_three'' f' ;;
+              ret (cl' ++ f'')
+  end.
+
+Definition cnf_to_three' (f : cnf_formula) : cnf_formula :=
+  snd (cnf_to_three'' f (cnf_max_var f + 1)).
+
 Close Scope nat.
 Open Scope N.
 
@@ -154,27 +186,6 @@ Proof.
       apply orb_prop in H11; intuition.
 Qed.
 
-Definition clause_to_three (cl : clause) : Fresh (list clause) :=
-  match cl with
-  | [] => x <- fresh ;;
-         ret [ [PosLit x; PosLit x; PosLit x]; [NegLit x; NegLit x; NegLit x] ]
-  | [a] => x <- fresh ;;
-          y <- fresh ;;
-          ret [ [a; PosLit x; PosLit y]
-              ; [a; NegLit x; PosLit y]
-              ; [a; PosLit x; NegLit y]
-              ; [a; NegLit x; NegLit y]
-              ]
-  | [a; b] => x <- fresh ;;
-             ret [ [a; b; PosLit x]
-                 ; [a; b; NegLit x]
-                 ]
-  | [a; b; c] => ret [ [a; b; c] ]
-  | a :: b :: cl' => x1 <- fresh ;;
-                  many <- from_many cl' x1 ;;
-                  ret ([a; b; PosLit x1] :: many)
-  end.
-
 Lemma N_max_repeat : forall a b,
     N.max a (N.max a b) = N.max a b.
 Proof.
@@ -298,14 +309,6 @@ Proof.
       apply H5; auto.
 Qed.
 
-Fixpoint cnf_to_three'' (f : cnf_formula) : Fresh cnf_formula :=
-  match f with
-  | nil => ret nil
-  | cl :: f' => cl' <- clause_to_three cl ;;
-              f'' <- cnf_to_three'' f' ;;
-              ret (cl' ++ f'')
-  end.
-
 Lemma Forall_app : forall A (P : A -> Prop) l1 l2,
     Forall P l1 ->
     Forall P l2 ->
@@ -352,9 +355,6 @@ Proof.
     + rewrite satisfies_cnf_formula_app in H6.
       apply andb_prop in H6; intuition.
 Qed.
-
-Definition cnf_to_three' (f : cnf_formula) : cnf_formula :=
-  snd (cnf_to_three'' f (cnf_max_var f + 1)).
 
 Lemma cnf_to_three'_correct : forall f,
     Forall (fun cl' => length cl' = 3%nat) (cnf_to_three' f) /\
