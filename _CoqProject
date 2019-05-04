@@ -1,0 +1,13 @@
+-R coq-ext-lib/theories ExtLib
+-R color CoLoR
+-R theories Hardness
+
+theories/Clique.v
+theories/CNFSAT.v
+theories/Fresh.v
+theories/Graph.v
+theories/Natnat.v
+theories/NPHard.v
+theories/Reduction.v
+theories/SAT.v
+theories/ThreeSAT.v

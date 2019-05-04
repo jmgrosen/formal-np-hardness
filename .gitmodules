@@ -1,0 +1,6 @@
+[submodule "color"]
+	path = color
+	url = git@github.com:fblanqui/color
+[submodule "coq-ext-lib"]
+	path = coq-ext-lib
+	url = git@github.com:coq-ext-lib/coq-ext-lib

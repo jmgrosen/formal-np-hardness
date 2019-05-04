@@ -11,13 +11,19 @@ Import MonadNotation.
 Open Scope monad_scope.
 Import ListNotations.
 
+Open Scope nat_scope.
+
 Definition threecnf_formula :=
-  { f : cnf_formula | Forall (fun c => length c = 3%nat) f}.
+  { f : cnf_formula | Forall (fun clause => length clause = 3) f}.
+
+Coercion threecnf_to_normal (f : threecnf_formula) : cnf_formula := proj1_sig f.
 
 Instance ThreeSAT : problem threecnf_formula :=
-  {| ProblemSize := fun x => cnf_formula_size (proj1_sig x);
-     ProblemYes := fun x => cnf_satisfiable (proj1_sig x);
+  {| ProblemSize := fun (f : threecnf_formula) => cnf_formula_size f;
+     ProblemYes := fun (f : threecnf_formula) => cnf_satisfiable f;
   |}.
+
+Close Scope nat_scope.
 
 Fixpoint from_many (cl : clause) (carry : var) : Fresh (list clause) :=
   match cl with
@@ -380,10 +386,18 @@ Definition cnf_to_three (f : cnf_formula) : threecnf_formula.
   apply cnf_to_three'_correct.
 Defined.
 
-Theorem three_sat_is_np_hard : np_hard ThreeSAT.
+Corollary cnf_to_three_correct : forall f,
+    (@ProblemYes _ CNFSAT f <-> @ProblemYes _ ThreeSAT (cnf_to_three f)).
 Proof.
-  apply (np_hard_reduction CNFSAT) with (f := cnf_to_three); [apply cnf_sat_is_np_hard |].
-  constructor; cbn; auto.
   intros.
   apply cnf_to_three'_correct.
+Qed.
+
+Hint Constructors reduction.
+
+Theorem three_sat_is_np_hard : np_hard ThreeSAT.
+Proof.
+  apply (np_hard_reduction CNFSAT) with (f := cnf_to_three).
+  { apply cnf_sat_is_np_hard. }
+  { auto using cnf_to_three_correct. }
 Qed.

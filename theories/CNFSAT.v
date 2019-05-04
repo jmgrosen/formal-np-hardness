@@ -38,7 +38,7 @@ Fixpoint satisfies_cnf_formula (a : var -> bool) (f : cnf_formula) : bool :=
   end.
 
 Definition cnf_satisfiable (f : cnf_formula) : Prop :=
-  exists a, satisfies_cnf_formula a f = true.
+  exists (a : var -> bool), satisfies_cnf_formula a f = true.
 
 Instance CNFSAT : problem cnf_formula :=
   {| ProblemSize := cnf_formula_size;
