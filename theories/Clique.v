@@ -10,8 +10,7 @@ From Hardness Require Natnat.
 
 Import ListNotations.
 
-Definition sized_clique (g : NGraph.graph) (k : nat) : Prop :=
-  exists (vs : NSet.t),
+Definition sized_clique (g : NGraph.graph) (k : nat) (vs : NSet.t) : Prop :=
     nset_size vs = k /\
     forall v1 v2,
       NSet.In v1 vs ->
@@ -20,8 +19,33 @@ Definition sized_clique (g : NGraph.graph) (k : nat) : Prop :=
 
 Instance CLIQUE : problem (undirected_graph * N) :=
   {| ProblemSize := fun '(g, k) => (graph_size (proj1_sig g) + N.to_nat (N.size k))%nat;
-     ProblemYes := fun '(g, k) => sized_clique (proj1_sig g) (N.to_nat k);
+     ProblemYes := fun '(g, k) => exists vs, sized_clique (proj1_sig g) (N.to_nat k) vs;
   |}.
+
+Definition enabled_vertex (lit : literal) (a : N -> bool) : bool :=
+  match lit with
+  | PosLit v => a v
+  | NegLit v => negb (a v)
+  end.
+
+Fixpoint enabled_vertices_cl (cl : clause) (cl_name : N) (a : N -> bool) : NSet.t * N :=
+  match cl with
+  | nil => (NSet.empty, 0)
+  | lit :: cl' =>
+    let '(vs, lit_name) := enabled_vertices_cl cl' cl_name a in
+    if enabled_vertex lit a
+    then (NSet.add (Natnat.encodeN (cl_name, lit_name)) vs, lit_name + 1)
+    else (vs, lit_name + 1)
+  end.
+
+Fixpoint enabled_vertices' (f : cnf_formula) (a : N -> bool) : NSet.t * N :=
+  match f with
+  | nil => (NSet.empty, 0)
+  | cl :: f' =>
+    let '(vs, cl_name) := enabled_vertices' f' a in
+    let '(new_vs, _) := enabled_vertices_cl cl cl_name a in
+    (NSet.union new_vs vs, cl_name + 1)
+  end.
 
 Definition unwrap_or {A} : A -> option A -> A :=
   option_rect (fun _ => A) (fun x => x).
@@ -86,6 +110,19 @@ Proof.
         now apply NSet.union_3.
 Qed.
 
+Import NGraph.R.
+
+Lemma merge_graphs_correct' : forall g1 g2,
+    NGraph.rel (merge_graphs g1 g2) == NGraph.rel g1 U NGraph.rel g2.
+Proof.
+  intros g1 g2.
+  unfold same_relation, Relation_Operators.union.
+  split;
+    intros v1 v2 H;
+    [ apply merge_graphs_correct in H | apply merge_graphs_correct ];
+    assumption.
+Qed.
+
 Definition edge (v1 v2 : N * N) : NGraph.graph :=
   let v1' := Natnat.encodeN v1 in
   let v2' := Natnat.encodeN v2 in
@@ -94,10 +131,15 @@ Definition edge (v1 v2 : N * N) : NGraph.graph :=
 Definition undirected_edge (v1 v2 : N * N) : NGraph.graph :=
   merge_graphs (edge v1 v2) (edge v2 v1).
 
-Definition undirected (g : NGraph.graph) :=
-  forall x y, NGraph.rel g x y -> NGraph.rel g y x.
+Lemma empty_undirected :
+  undirected NMap.empty.
+Proof.
+  intros x y H.
+  apply NGraph.rel_empty in H.
+  inversion H.
+Qed.
 
-Import NGraph.R.
+Hint Resolve empty_undirected.
 
 Lemma undirected_edge_undirected : forall v1 v2,
     undirected (undirected_edge v1 v2).
@@ -134,6 +176,22 @@ Proof.
     auto.
 Qed.
 
+Hint Resolve undirected_edge_undirected.
+
+Lemma merge_graphs_undirected : forall g1 g2,
+    undirected g1 ->
+    undirected g2 ->
+    undirected (merge_graphs g1 g2).
+Proof.
+  unfold undirected.
+  intros g1 g2 H1 H2 x y H.
+  apply merge_graphs_correct in H.
+  apply merge_graphs_correct.
+  intuition.
+Qed.
+
+Hint Resolve merge_graphs_undirected.
+
 Fixpoint edges_for_lit_cl (cl : clause) (cl_name : N) (lit : literal) (v : N * N) : NGraph.graph * N :=
   match cl with
   | nil => (NMap.empty, 0)
@@ -150,15 +208,18 @@ Fixpoint edges_for_lit_cl (cl : clause) (cl_name : N) (lit : literal) (v : N * N
     end
   end.
 
-Lemma edges_for_lit_cl_correct : forall cl cl_name lit v,
+Lemma edges_for_lit_cl_undirected : forall cl cl_name lit v,
     let '(g, _) := edges_for_lit_cl cl cl_name lit v in
     undirected g.
 Proof.
-  induction cl; cbn; intros cl_name lit v.
-  - intros x y H.
-    apply NGraph.rel_empty in H.
-    inversion H.
-  - 
+  induction cl; cbn; auto.
+  intros cl_name lit v.
+  specialize (IHcl cl_name lit v).
+  destruct edges_for_lit_cl.
+  destruct lit, a;
+    try destruct N.eq_dec;
+    auto.
+Qed.
 
 Fixpoint edges_for_lit (f : cnf_formula) (lit : literal) (v : N * N) : NGraph.graph * N :=
   match f with
@@ -169,23 +230,71 @@ Fixpoint edges_for_lit (f : cnf_formula) (lit : literal) (v : N * N) : NGraph.gr
     (merge_graphs edges lit_edges, cl_name + 1)
   end.
 
-Fixpoint edges_for_clause (f : cnf_formula) (cl : clause) (cl_name : N) : NGraph.graph * N :=
+Lemma edges_for_lit_undirected : forall f lit v,
+    let '(g, _) := edges_for_lit f lit v in
+    undirected g.
+Proof.
+  induction f; cbn; auto.
+  intros lit v.
+  specialize (IHf lit v).
+  destruct edges_for_lit.
+  pose proof (edges_for_lit_cl_undirected a n lit v).
+  destruct edges_for_lit_cl.
+  auto.
+Qed.
+
+Fixpoint edges_for_clause (cl : clause) (f : cnf_formula) (cl_name : N) : NGraph.graph * N :=
   match cl with
   | nil => (NMap.empty, 0)
   | l :: cl' =>
-    let '(edges, l_name) := edges_for_clause f cl' cl_name in
+    let '(edges, l_name) := edges_for_clause cl' f cl_name in
     let '(new_edges, _) := edges_for_lit f l (cl_name, l_name) in
     (merge_graphs edges new_edges, l_name + 1)
   end.
 
-Fixpoint do_the_thing (f : cnf_formula) : NGraph.graph * N :=
+Lemma edges_for_clauses_undirected : forall cl f cl_name,
+    let '(g, _) := edges_for_clause cl f cl_name in
+    undirected g.
+Proof.
+  induction cl; cbn; auto.
+  intros f cl_name.
+  specialize (IHcl f cl_name).
+  destruct edges_for_clause.
+  pose proof (edges_for_lit_undirected f a (cl_name, n)).
+  destruct edges_for_lit.
+  auto.
+Qed.
+
+Fixpoint cnfsat_to_clique' (f : cnf_formula) : NGraph.graph * N :=
   match f with
   | nil => (NMap.empty, 0)
   | cl :: f' =>
-    let '(g, n) := do_the_thing f' in
-    let '(edges, _) := edges_for_clause f' cl n in
+    let '(g, n) := cnfsat_to_clique' f' in
+    let '(edges, _) := edges_for_clause cl f' n in
     (merge_graphs g edges, n + 1)
   end.
 
-(* Definition cnfsat_to_clique (f : cnf_formula) : NGraph.graph * N := *)
-(*   () *)
+Lemma cnfsat_to_clique'_undirected : forall f,
+    let '(g, _) := cnfsat_to_clique' f in
+    undirected g.
+Proof.
+  induction f; cbn; auto.
+  destruct cnfsat_to_clique'.
+  pose proof (edges_for_clauses_undirected a f n).
+  destruct edges_for_clause.
+  auto.
+Qed.
+
+Definition cnfsat_to_clique (f : cnf_formula) : undirected_graph * N.
+  pose proof (cnfsat_to_clique'_undirected f).
+  destruct cnfsat_to_clique' as [g k].
+  split; [| exact k].
+  exists g.
+  assumption.
+Defined.
+
+Lemma sized_clique_larger : forall g k1 k2,
+    (k1 >= k2)%nat ->
+    sized_clique g k1 ->
+    sized_clique g k2.
+Admitted.

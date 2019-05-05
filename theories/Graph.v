@@ -12,8 +12,11 @@ Module NGraph := FGraph.Make NSet NMap.
 
 (* Coercion NGraph.rel : NGraph.graph >-> NGraph.relation_on_X. *)
 
+Definition undirected (g : NGraph.graph) :=
+  forall x y, NGraph.rel g x y -> NGraph.rel g y x.
+
 Definition undirected_graph :=
-  { g : NGraph.graph | forall x y, NGraph.rel g x y -> NGraph.rel g y x }.
+  { g : NGraph.graph | undirected g }.
 
 Definition nset_size (s : NSet.t) : nat :=
   NSet.fold (fun _ n => S n) s 0.
