@@ -4,7 +4,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage{minted}
 \usepackage{ulem}
-\usepackage{soul}
+\usepackage{fancyvrb}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,hobby,calc}
 
@@ -57,10 +57,6 @@
   \pause
   \centering
   Humans get things wrong!
-
-  %% \only<2>{They're hard}
-  %% \only<3>{They're \sout{hard} really hard}
-  %% \only<4>{They're \sout{hard} \sout{really hard} really really hard}
 \end{frame}
 
 \begin{frame}
@@ -122,26 +118,186 @@ Lemma sum_from_0_to_spec : forall n,
   \frametitle{How do you use Coq?}
   \framesubtitle{Proof}
 
-  \begin{columns}
-    \column{0.6\textwidth}
+  %% \addtolength{\tabcolsep}{-10pt}
 
+  \begin{columns}
+
+    \begin{column}{0.35\textwidth}
+
+    \minipage[c][0.65\textheight][s]{\columnwidth}
     \footnotesize
     \begin{semiverbatim}
-Lemma sum_from_0_to_spec : forall n,
-    2 * sum_from_0_to n = n * (n + 1).
-Proof.\pause
-  induction n.\pause
-  -\pause simpl.\pause
-    reflexivity.\pause
-  -\pause simpl.\pause
-    rewrite PeanoNat.Nat.mul_succ_r.\pause
-    rewrite <-IHn.\pause
-    lia.\pause
+Proof.\onslide<2->
+  induction n.\onslide<3->
+  -\onslide<4-> simpl.\onslide<5->
+    reflexivity.\onslide<6->
+  -\onslide<7-> simpl.\onslide<8->
+    rewrite mul_succ_r.\onslide<9->
+    rewrite <-IHn.\onslide<10->
+    omega.\onslide<11->
 Qed.
     \end{semiverbatim}
+    \endminipage
+    \end{column}
 
-    \column{0.4\textwidth}
+    \begin{column}{0.7\textwidth}
+    \footnotesize
+    \onslide<1->
+    \begin{onlyenv}<1>
+    \minipage[c][0.65\textheight][s]{\columnwidth}
+    \begin{minted}{coq}
+1 subgoal (ID 4)
+  
+============================
+forall n : nat,
+  2 * sum_from_0_to n = n * (n + 1)
+    \end{minted}
+    \endminipage
+    \end{onlyenv}
+
+    \begin{onlyenv}<2>
+    \minipage[c][0.65\textheight][s]{\columnwidth}
+    \begin{minted}{coq}
+2 subgoals (ID 9)
+  
+============================
+  2 * sum_from_0_to 0 = 0 * (0 + 1)
+
+subgoal 2 (ID 12) is:
+ 2 * sum_from_0_to (S n) = S n * (S n + 1)
+    \end{minted}
+    \endminipage
+    \end{onlyenv}
+
+    \begin{onlyenv}<3>
+    \minipage[c][0.65\textheight][s]{\columnwidth}
+    \begin{minted}{coq}
+1 subgoal (ID 9)
+  
+  ============================
+  2 * sum_from_0_to 0 = 0 * (0 + 1)
+    \end{minted}
+    \endminipage
+    \end{onlyenv}
+
+    \begin{onlyenv}<4>
+    \minipage[c][0.65\textheight][s]{\columnwidth}
+    \begin{minted}{coq}
+1 subgoal (ID 21)
+  
+  ============================
+  0 = 0
+    \end{minted}
+    \endminipage
+    \end{onlyenv}
+
+    \begin{onlyenv}<5>
+    \minipage[c][0.65\textheight][s]{\columnwidth}
+    \begin{minted}{coq}
+1 subgoal (ID 12)
+
+subgoal 1 (ID 12) is:
+ 2 * sum_from_0_to (S n) = S n * (S n + 1)
+    \end{minted}
+
+    \vspace{5ex}
+
+    \begin{Verbatim}[fontshape=it]
+This subproof is complete,
+  but there are some unfocused goals.
+Focus next goal with bullet -.
+    \end{Verbatim}
+    \endminipage
+    \end{onlyenv}
+
+    \begin{onlyenv}<6>
+    \minipage[c][0.65\textheight][s]{\columnwidth}
+    \begin{minted}{coq}
+1 subgoal (ID 12)
+  
+  n : nat
+  IHn : 2 * sum_from_0_to n = n * (n + 1)
+  ============================
+  2 * sum_from_0_to (S n) = S n * (S n + 1)
+    \end{minted}
+    \endminipage
+    \end{onlyenv}
+
+    \begin{onlyenv}<7>
+    \minipage[c][0.65\textheight][s]{\columnwidth}
+    \begin{minted}{coq}
+1 subgoal (ID 36)
+  
+  n : nat
+  IHn : 2 * sum_from_0_to n = n * (n + 1)
+  ============================
+  S (n + sum_from_0_to n +
+     S (n + sum_from_0_to n + 0)) =
+  S (n + 1 + n * S (n + 1))
+    \end{minted}
+    \endminipage
+    \end{onlyenv}
+
+    \begin{onlyenv}<8>
+    \minipage[c][0.65\textheight][s]{\columnwidth}
+    \begin{minted}{coq}
+1 subgoal (ID 37)
+  
+  n : nat
+  IHn : 2 * sum_from_0_to n = n * (n + 1)
+  ============================
+  S (n + sum_from_0_to n +
+     S (n + sum_from_0_to n + 0)) =
+  S (n + 1 + (n * (n + 1) + n))
+    \end{minted}
+    \endminipage
+    \end{onlyenv}
+
+    \begin{onlyenv}<9>
+    \minipage[c][0.65\textheight][s]{\columnwidth}
+    \begin{minted}{coq}
+1 subgoal (ID 38)
+  
+  n : nat
+  IHn : 2 * sum_from_0_to n = n * (n + 1)
+  ============================
+  S (n + sum_from_0_to n +
+     S (n + sum_from_0_to n + 0)) =
+  S (n + 1 + (2 * sum_from_0_to n + n))
+    \end{minted}
+    \endminipage
+    \end{onlyenv}
+
+    \begin{onlyenv}<10>
+    \minipage[c][0.65\textheight][s]{\columnwidth}
+    \vspace{30ex}
+
+    \begin{Verbatim}[fontshape=it]
+No more subgoals.
+    \end{Verbatim}
+    \endminipage
+    \end{onlyenv}
+
+    \begin{onlyenv}<11>
+    \minipage[c][0.65\textheight][s]{\columnwidth}
+    \vspace{30ex}
+
+    \begin{Verbatim}[fontshape=it]
+sum_from_0_to_spec is defined
+    \end{Verbatim}
+    \endminipage
+    \end{onlyenv}
+
+    \end{column}
   \end{columns}
+\end{frame}
+
+\begin{frame}
+  \centering
+  \includegraphics[height=0.7\textheight]{pythagoras}
+  \par
+  \vspace{4ex}
+  Pythagoras would be proud.
 \end{frame}
 
 \section{Hardness Proofs in Coq}
