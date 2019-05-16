@@ -13,32 +13,34 @@ Inductive literal :=
 | PosLit : var -> literal
 | NegLit : var -> literal
 .
+
 Definition clause : Type := list literal.
 Definition cnf_formula : Type := list clause.
+Definition assignment : Type := var -> bool.
 
 Definition cnf_formula_size (f : cnf_formula) : nat :=
   fold_left (fun x y => x + y + 1) (map (@length _) f) 0.
 
-Definition satisfies_literal (a : var -> bool) (l : literal) : bool :=
+Definition satisfies_literal (a : assignment) (l : literal) : bool :=
   match l with
   | PosLit v => a v
   | NegLit v => negb (a v)
   end.
 
-Fixpoint satisfies_clause (a : var -> bool) (c : clause) : bool :=
+Fixpoint satisfies_clause (a : assignment) (c : clause) : bool :=
   match c with
   | nil => false
   | l :: c' => satisfies_literal a l || satisfies_clause a c'
   end.
 
-Fixpoint satisfies_cnf_formula (a : var -> bool) (f : cnf_formula) : bool :=
+Fixpoint satisfies_cnf_formula (a : assignment) (f : cnf_formula) : bool :=
   match f with
   | nil => true
   | c :: f' => satisfies_clause a c && satisfies_cnf_formula a f'
   end.
 
 Definition cnf_satisfiable (f : cnf_formula) : Prop :=
-  exists (a : var -> bool), satisfies_cnf_formula a f = true.
+  exists (a : assignment), satisfies_cnf_formula a f = true.
 
 Instance CNFSAT : problem cnf_formula :=
   {| ProblemSize := cnf_formula_size;

@@ -16,7 +16,7 @@ Lemma np_hard_reduction : forall `(PA : problem A) `(PB : problem B) (f : A -> B
     reduction PA PB f ->
     np_hard PB.
 Proof.
-  intros * [g ?] H1.
+  intros * [g ?] ?.
   exists (fun x => f (g x)).
   eapply reduction_comp; eauto.
 Qed.

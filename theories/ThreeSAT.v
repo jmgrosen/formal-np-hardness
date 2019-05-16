@@ -114,7 +114,10 @@ Lemma from_many_correct : forall cl carry n,
         exists a',
           (forall v, v < n -> a v = a' v) /\
           satisfies_cnf_formula a' f' = true) /\
-    (forall a, a carry = true -> satisfies_cnf_formula a f' = true -> satisfies_clause a cl = true).
+    (forall a,
+        a carry = true ->
+        satisfies_cnf_formula a f' = true ->
+        satisfies_clause a cl = true).
 Proof.
   induction cl; intros; [| destruct cl]; [| | destruct cl].
   - destruct from_many; cbn in *; lia.
@@ -126,8 +129,7 @@ Proof.
        [ exists a; intuition; cbn; rewrite H2; btauto
        | exists a; intuition; rewrite H2; btauto
        | cbn in *; rewrite H2 in *; bool_simpl in *; auto]).
-  - cbv delta [from_many].
-    cbv iota.
+  - cbv iota delta [from_many].
     fold from_many.
     cbv beta iota.
     remember (l :: l0 :: cl) as cl'.

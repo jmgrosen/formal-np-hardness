@@ -4,11 +4,34 @@ Require Import Coq.Classes.SetoidTactics.
 Require Import Coq.Classes.Morphisms Coq.Classes.Morphisms_Prop.
 Require Export Coq.Classes.RelationClasses Coq.Relations.Relation_Definitions.
 Require Import Coq.Classes.Equivalence Coq.Program.Basics.
+Require Import Psatz.
 
 From Hardness Require Import CNFSAT Graph Reduction.
 From Hardness Require Natnat.
 
 Import ListNotations.
+
+Close Scope N.
+Open Scope nat.
+
+Fixpoint sum_from_0_to (n : nat) : nat :=
+  match n with
+  | 0 => 0
+  | S n' => n + sum_from_0_to n'
+  end.
+
+Lemma sum_from_0_to_spec : forall n,
+    2 * sum_from_0_to n = n * (n + 1).
+Proof.
+  induction n.
+  - simpl.
+    reflexivity.
+  - simpl.
+    replace (n + sum_from_0_to n + S (n + sum_from_0_to n + 0))%nat with (n + S n + 2 * sum_from_0_to n) by lia.
+    rewrite IHn.
+    rewrite PeanoNat.Nat.mul_succ_r.
+    lia.
+Qed.
 
 Definition sized_clique (g : NGraph.graph) (k : nat) (vs : NSet.t) : Prop :=
     nset_size vs = k /\
