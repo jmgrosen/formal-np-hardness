@@ -1,11 +1,15 @@
 \documentclass{article}
 
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{fullpage}
 \usepackage{biblatex}
+\usepackage{minted}
 \addbibresource{bibliography.bib}
 
-\title{6.892 Project Report: Formal Proofs of NP-Hardness}
-\author{John Grosen and Lily Chung}
-\date{15 April 2019}
+\title{6.892 Project Report: Formal Proofs of NP-Hardness Reductions}
+\author{John Grosen}
+\date{15 May 2019}
 
 \begin{document}
 
@@ -20,116 +24,591 @@ proofs, though, have been on whiteboards, in conversation, on Coauthor, or on
 they are proof sketches -- the point is that they contain enough detail for a
 human to verify with reasonable confidence. However, informal proofs have their
 faults -- for example, it has been mentioned a couple times that a result stated
-in the lecture videos actually had a bug in the proof, usually small and easily
-fixable, but not always.
+in the lecture videos actually had a bug in the proof, including one in a book
+published ten years ago~\cite{c07updates2019}. These bugs are usually small and
+easily fixable, not threatening the integrity of the proof, but the danger is
+still there.
 
-For this reason (...along with our own personal interests...), we have been
-thinking about writing proofs of complexity results \emph{formally} -- that is,
-proofs written in a formal system that can be verified by a computer. This can
-provide greater guarantees that a proof is correct, at the expense of a lot more
-work writing the proof.
+For this reason, we consider writing proofs of complexity results
+\emph{formally} -- that is, writing proofs in a formal system that can be
+verified by a computer. This can provide greater guarantees that a proof is
+correct, as proof-checking systems are much less likely to faultily verify a
+buggy proof (especially when the proof is written honestly). However, this comes
+at the expense of two things:
+\begin{itemize}
+\item Formalizing a proof takes a long time. Humans leave out lots of minutiae
+  in their proofs, relying on the reader to fill them in. Computers are not so
+  forgiving -- while modern systems have surprisingly powerful systems for
+  automating proofs, they are still no match for humans' intuition. However,
+  this work is borne by the proof writer, so the reader may simply benefit from
+  it.
+\item The proof reader must understand \emph{exactly} what is being proven. In
+  the case of reductions, this primarily means understanding the formal
+  specification of the problem being reduced to. Sometimes this is easy--for
+  example, it is very easy to embed the definition of CNF-SAT, as we see later.
+  However, other times intuitive definitions are extremely difficult to capture
+  formally, as is the case with the usual definition of planar graphs: defining
+  an embedding into $\mathbb{R}^2$ is wildly impractical, so other definitions,
+  shown on paper to be equivalent, are used instead~\cite{yamamoto1995}. Small
+  mistakes in specifying problems, though, can lead to trivial ``proofs'' about
+  problems which do not actually match up with intuitive definitions.
+\end{itemize}
+Nevertheless, we believe that these tradeoffs can be worth it, especially for
+reductions where the target problem can be simply stated formally.
 
-The goal of this project, then, is to write a library in Coq for proving that
-certain problems are NP-hard, and then prove some problems to be NP-hard. We
-suppose this is closest to an ``implementation'' type of project.
+In this work, we formalize a notion of reductions between problems in the proof
+assistant Coq, then use it to prove the correctness of reductions between a few
+problems. Unfortunately, due to lack of time, we do not include any running time
+restrictions in our definition of reductions, so that property must still be
+verified by hand.
 
 \section{Related Work}
 
 To our surprise, we were not able to find any existing work on formal proofs of
-complexity results. Thus, there are three main categories of related works:
-informal complexity proofs, formal proofs of correctness, and formal proofs of
-polytimeness.
+complexity reduction correctness. Thus, there are three main categories of
+related works: informal complexity proofs, formal proofs of correctness, and
+formal proofs of polytimeness.
 
 For the first category, given our initially simple goals, we focus primarily on
 the two fundamental works of NP-hardness. In 1971, Cook proved that CNF-SAT (and
 thus SAT) is NP-hard~\cite{cook1971}. The next year, Karp built on Cook's work
 to demonstrate the NP-hardness of a smattering of classic
-problems~\cite{karp1972}.
+problems~\cite{karp1972}. We draw upon this set of problems for the reductions
+we implement and prove.
 
 The idea of formally proving mathematical theorems has been in vogue for a while
 now, with a few famous results, such as a formal proof of the four color
 theorem~\cite{gonthier2008}. We use the proof assistant Coq for our
 formalization~\cite{coq2019}.
 
-We see four primary approaches to formally proving polytimeness:
+We see four primary approaches to formally proving polytimeness, presented in
+roughly decreasing order of both formality and difficulty:
 \begin{enumerate}
-\item Use a language that limits you to explicitly the polytime functions.
-  Apparently Bellantoni and Cook gave a \emph{fully syntactic} characterization
-  of polytime functions~\cite{recursion92} -- super cool! In particular, it has
-  soundness (every syntactically valid program executes in polytime) and
-  \emph{extensional} completeness (for every function problem which can be
-  solved in polytime, there exists a syntactically valid program that computes
-  that function). Heraud and Nowak formalized it in Coq~\cite{formalization11}.
-  However, it's apparently extremely hard to write actual programs in -- and, we
-  imagine, verify programs in. So probably not what we're looking for.
+\item Use a language that syntactically limits you to exactly the polytime
+  functions, at the expense of much
+  expressiveness~\cite{recursion92,formalization11}.
+  %% Apparently Bellantoni and Cook gave a \emph{fully syntactic} characterization
+  %% of polytime functions~\cite{recursion92} -- super cool! In particular, it has
+  %% soundness (every syntactically valid program executes in polytime) and
+  %% \emph{extensional} completeness (for every function problem which can be
+  %% solved in polytime, there exists a syntactically valid program that computes
+  %% that function). Heraud and Nowak formalized it in Coq~\cite{formalization11}.
+  %% However, it's apparently extremely hard to write actual programs in -- and, we
+  %% imagine, verify programs in. So probably not what we're looking for.
 
-\item In the same vein, there's restrictions on term rewriting systems that
-  gives you polytime-ness. In particular, there's one that uses
-  "quasi-interpretations"~\cite{quasi11}, as formalized in Coq by some of the
-  same folks as before~\cite{formal18}. This seems a good bit nicer, though
-  still not terribly easy to use -- they proved the polytime-ness and
-  correctness of binary addition in about ~300 fairly simple-looking lines of
-  Coq, and of modular exponentiation in about ~1000 lines. However, this (from
-  the formalization paper) scares me: "Indeed, there may be a program prog1
-  [...] with a QI interpretation, but which can’t be extended with a program
-  prog2 defined on top of it [...] such that a QI can be found, in which case
-  prog1, or at least its QI, has to be modified." Given that a lot of reductions
-  reduce most easily from problems other than SAT known to be NP-hard, we want
-  some sort of transitivity -- e.g., if we know there's a reduction from SAT to
-  3SAT and a reduction from 3SAT to problem A, we know there's a reduction from
-  SAT to problem A. However, this warning of non-compositionality makes me worry
-  that such a property might be impossible to prove.
+\item Use a term-rewriting system along with restrictions that guarantee
+  polytimeness, at the expense of compositionality~\cite{quasi11,formal18}.
+  %% In the same vein, there's restrictions
+  %% on term rewriting systems that gives you polytime-ness. In particular, there's
+  %% one that uses "quasi-interpretations"~\cite{quasi11}, as formalized in Coq by
+  %% some of the same folks as before~\cite{formal18}. This seems a good bit nicer,
+  %% though still not terribly easy to use -- they proved the polytime-ness and
+  %% correctness of binary addition in about ~300 fairly simple-looking lines of
+  %% Coq, and of modular exponentiation in about ~1000 lines. However, this (from
+  %% the formalization paper) scares me: "Indeed, there may be a program prog1
+  %% [...] with a QI interpretation, but which can’t be extended with a program
+  %% prog2 defined on top of it [...] such that a QI can be found, in which case
+  %% prog1, or at least its QI, has to be modified." Given that a lot of reductions
+  %% reduce most easily from problems other than SAT known to be NP-hard, we want
+  %% some sort of transitivity -- e.g., if we know there's a reduction from SAT to
+  %% 3SAT and a reduction from 3SAT to problem A, we know there's a reduction from
+  %% SAT to problem A. However, this warning of non-compositionality makes me worry
+  %% that such a property might be impossible to prove.
 
-\item There are operational semantics for use with deeply embedded languages
-  which instrument execution with a time cost. These have the unfortunate
-  downside (as best we can tell) that they don't have any direct connection to
-  running time on Turing machines, unlike the previous approaches, which are
-  proven (at least on paper) to be equivalent to the class of polytime function
-  problems. There seem to be three approaches to using these: directly, with
-  some sort of Hoare logic, or with a type system. For small examples, maybe
-  just directly inverting a bigstep relation might work. But for larger
-  programs, some people have used Hoare logics; the example of this that we're
-  aware of is by Charguéraud and Pottier, who used a separation logic with time
-  credits to prove amortized complexity of some ML programs~\cite{machine15}.
-  The proofs look pretty nasty though. The alternate approach is through the
-  type system; the example we know of here is TiML~\cite{timl17}, a project from
-  a former student in our lab, which is much much nicer to use, but currently
-  isn't really set up to do proofs about the programs in Coq. However, it's
-  worth noting that with both of these, the goal is typically to prove some time
-  bound much finer-grained than just polytime.
+\item Use a time-augmented operational semantics for a deeply embedded language
+  and prove a polynomial time bound, at the expense of no formal connection to
+  complexity classes~\cite{machine15,timl17}.
+  %% There are operational semantics
+  %% for use with deeply embedded languages which instrument execution with a time
+  %% cost. These have the unfortunate downside (as best we can tell) that they
+  %% don't have any direct connection to running time on Turing machines, unlike
+  %% the previous approaches, which are proven (at least on paper) to be equivalent
+  %% to the class of polytime function problems. There seem to be three approaches
+  %% to using these: directly, with some sort of Hoare logic, or with a type
+  %% system. For small examples, maybe just directly inverting a bigstep relation
+  %% might work. But for larger programs, some people have used Hoare logics; the
+  %% example of this that we're aware of is by Charguéraud and Pottier, who used a
+  %% separation logic with time credits to prove amortized complexity of some ML
+  %% programs~\cite{machine15}. The proofs look pretty nasty though. The alternate
+  %% approach is through the type system; the example we know of here is
+  %% TiML~\cite{timl17}, a project from a former student in our lab, which is much
+  %% much nicer to use, but currently isn't really set up to do proofs about the
+  %% programs in Coq. However, it's worth noting that with both of these, the goal
+  %% is typically to prove some time bound much finer-grained than just polytime.
 
-\item Finally, there are axiomatic cost models of shallowly-embedded languages
-  in coq, such as the model included as part of the Foundational Cryptography
-  Framework~\cite{fcf15}. These have the least connection to the underlying
-  complexity theory, but tend to be the easiest to use, and have been used to
-  model polynomially-bounded adversaries in formal cryptographic settings. They
-  allow the use of normal Coq definitions, meaning they are easy to reason about
-  using the built-in tools of Coq.
+\item Use an axiomatic cost model for a shallowly-embedded language and prove a
+  polynomial time bound, at the expense of no formal connection to complexity
+  classes and even no proof of consistency (!)~\cite{fcf15}.
+  %% Finally, there are
+  %% axiomatic cost models of shallowly-embedded languages in coq, such as the
+  %% model included as part of the Foundational Cryptography
+  %% Framework~\cite{fcf15}. These have the least connection to the underlying
+  %% complexity theory, but tend to be the easiest to use, and have been used to
+  %% model polynomially-bounded adversaries in formal cryptographic settings. They
+  %% allow the use of normal Coq definitions, meaning they are easy to reason about
+  %% using the built-in tools of Coq.
 \end{enumerate}
+Given the limited time available for this class project and the lack of a
+ready-to-go option for verifying polytimeness, we decided to ignore that aspect
+of reductions and just focus on correctness.
 
-Although the first two options are perhaps the most theoretically sound, we
-intend to go with either option 3 or 4, considering the limited time available
-for a class project.
+\section{Reduction Formalization}
 
-\section{Milestones}
+First, we define what a problem is. Given a carrier instance type $A$, a problem
+tells you the size of an instance and a proposition determining whether or not
+an instance is a YES-instance or a NO-instance:
 
-\begin{enumerate}
-\item Get a reasonable definition of NP-hard written down, based on the approach
-  described above.
-\item Prove 3-SAT to be NP-hard.
-\item Prove some puzzle to be NP-hard from 3-SAT.
-\item lily help me out here
-\end{enumerate}
+\begin{minted}{coq}
+Class problem A :=
+  { ProblemSize : A -> nat;
+    ProblemYes : A -> Prop;
+  }.
+\end{minted}
 
-If we manage to do all that, we could prove NP-hardness of more classic
-problems, or could prove PSPACE-hardness of some problems (since our technique
-is easily modifiable to this -- just swap out SAT for QSAT).
+From there, we define what a reduction is. A reduction from problem $A$ to
+problem $B$ is a function $f : A \to B$ that is polytime and correct, i.e., for
+any instance $x$ of $A$, $x$ is a YES-instance of $A$ if and only if $f(x)$ is a
+YES-instance of $B$:
+\begin{minted}{coq}
+Class reduction {A B} (PA : problem A) (PB : problem B) (f : A -> B) :=
+  { ReductionPolytime : polytime f;
+    ReductionCorrect : forall x, ProblemYes x <-> ProblemYes (f x);
+  }.
+\end{minted}
+However, since we aren't proving polytimeness, \mintinline{coq}{polytime f} is
+defined such that it is always trivially true (with the hope that potentially
+one day \mintinline{coq}{polytime} would be defined more interestingly).
 
-\section{Authors}
+From here, we prove a trivial but useful lemma: if $f$ is a reduction from $A$
+to $B$ and $g$ is a reduction from $B$ to $C$, then $g \circ f$ is a reduction
+from $A$ to $C$:
+\begin{samepage}
+\begin{minted}{coq}
+Instance reduction_comp
+         {A B C}
+         (PA : problem A) (PB : problem B) (PC : problem C)
+         (f : A -> B) (g : B -> C)
+         (r1 : reduction PA PB f) (r2 : reduction PB PC g)
+  : reduction PA PC (fun x => g (f x)).
+Proof.
+  destruct r1, r2.
+  constructor; firstorder.
+Qed.
+\end{minted}
+\end{samepage}
 
-This is intended to be John's \emph{main} (and only) project. Lily is planning
-to make \emph{minor} contributions.
+After defining FORMULA-SAT (which we call SAT for some reason), we define that a
+problem is NP-hard if there exists a reduction from FORMULA-SAT to it:
+\begin{samepage}
+  \begin{minted}{coq}
+Definition np_hard `(PA : problem A) : Prop :=
+  exists f, reduction SAT PA f.
+  \end{minted}
+\end{samepage}
+
+And, using our earlier lemma, we show that if problem $A$ is NP-hard and there
+exists a reduction from $A$ to $B$, then $B$ is NP-hard:
+\begin{samepage}
+  \begin{minted}{coq}
+Lemma np_hard_reduction : forall `(PA : problem A) `(PB : problem B) (f : A -> B),
+    np_hard PA ->
+    reduction PA PB f ->
+    np_hard PB.
+Proof.
+  intros * [g ?] ?.
+  exists (fun x => f (g x)).
+  eapply reduction_comp; eauto.
+Qed.
+  \end{minted}
+\end{samepage}
+
+Using this, we've proved the correctness of a reduction from FORMULA-SAT to
+CNF-SAT and from CNF-SAT to 3SAT. We're currently working on a reduction from
+CNF-SAT to CLIQUE, but dealing with graphs has been trickier.
+
+\section{Case Study: CNF-SAT $\leq$ 3SAT}
+
+As an illustration of what a formal proof of an actual reduction looks like, we
+examine our reduction from CNF-SAT to 3SAT.
+
+\newmintinline[coq]{coq}{}
+
+First, we define the syntax of CNF-SAT. We define variables to be values of type
+\coq{N}, the binary-representation natural number type. Literals are a variable
+along with whether they're positive or negative. Clauses are lists of literals
+and formulas are lists of clauses, where \coq{list} is the standard library
+linked-list type. The size of a formula just adds the number of literals to the
+number of clauses.
+\begin{samepage}
+  \begin{minted}{coq}
+Definition var : Type := N.
+
+Inductive literal :=
+| PosLit : var -> literal
+| NegLit : var -> literal
+.
+
+Definition clause : Type := list literal.
+Definition cnf_formula : Type := list clause.
+
+Definition cnf_formula_size (f : cnf_formula) : nat :=
+  fold_left (fun x y => x + y + 1) (map (@length _) f) 0.
+  \end{minted}
+\end{samepage}
+
+From there, we define the semantics. A variable assignment is a function from
+variables to booleans. An assignment satisfies a positive literal iff it assigns
+\coq{true} to its variable and satisfies a negative literal iff it assigns
+\coq{false} to its literal. An assignment satisfies a clause iff it satisfies at
+least one of its literals. An assignment satisfies a formula iff it satisfies
+all of its clauses. A formula is satisfiable iff there exists an assignment
+which satisfies it. Finally, we declare the problem \coq{CNFSAT} using these
+definitions.
+\begin{samepage}
+  \begin{minted}{coq}
+Definition assignment : Type := var -> bool.
+
+Definition satisfies_literal (a : assignment) (l : literal) : bool :=
+  match l with
+  | PosLit v => a v
+  | NegLit v => negb (a v)
+  end.
+
+Fixpoint satisfies_clause (a : assignment) (c : clause) : bool :=
+  match c with
+  | nil => false
+  | l :: c' => satisfies_literal a l || satisfies_clause a c'
+  end.
+
+Fixpoint satisfies_cnf_formula (a : assignment) (f : cnf_formula) : bool :=
+  match f with
+  | nil => true
+  | c :: f' => satisfies_clause a c && satisfies_cnf_formula a f'
+  end.
+
+Definition cnf_satisfiable (f : cnf_formula) : Prop :=
+  exists (a : assignment), satisfies_cnf_formula a f = true.
+
+Instance CNFSAT : problem cnf_formula :=
+  {| ProblemSize := cnf_formula_size;
+     ProblemYes := cnf_satisfiable;
+  |}.
+  \end{minted}
+\end{samepage}
+
+We then proceed to prove CNFSAT hard by reduction from FORMULA-SAT, but we don't
+overview the proof here.
+
+Now we define 3SAT. Using subset types, the definition is very simple: a 3-CNF
+formula is just a CNF formula where each clause has length 3. (Here we used
+exactly 3, rather than at most 3, for whatever reason.)
+\begin{samepage}
+  \begin{minted}{coq}
+Definition threecnf_formula :=
+  { f : cnf_formula | Forall (fun clause => length clause = 3) f}.
+  \end{minted}
+\end{samepage}
+
+Then the problem \coq{ThreeSAT} (no identifiers starting with numbers!) just
+reuses CNF-SAT's definition of size and satisfiability:
+\begin{samepage}
+  \begin{minted}{coq}
+Instance ThreeSAT : problem threecnf_formula :=
+  {| ProblemSize := fun f => cnf_formula_size (proj1_sig f);
+     ProblemYes := fun f => cnf_satisfiable (proj1_sig f);
+  |}.
+  \end{minted}
+\end{samepage}
+(\coq{proj1_sig f} just projects out only the data, throwing the proof of
+threeness away.)
+
+Now for the actual reduction. We follow Wikipedia's reduction, which it takes
+from Aho and Hopcroft: ``To reduce the unrestricted SAT problem to 3-SAT,
+transform each clause $l_1 \lor \dots \lor l_n$ to a conjunction of $n - 2$
+clauses
+\begin{align*}
+  &(l_1 \lor l_2 \lor x_2) \land \\
+  &(\neg x_2 \lor l_3 \lor x_3) \land \\
+  &(\neg x_3 \lor l_4 \lor x_4) \land \dots \land \\
+  &(\neg x_{n-3} \lor l_{n-2} \lor x_{n-2}) \land \\
+  &(\neg x_{n-2} \lor l_{n-1} \lor l_n)
+\end{align*}
+where $x_2, \dots, x_{n-2}$ are fresh variables not occurring
+elsewhere''~\cite{wiki3sat,aho1974}.
+
+In our formalized reduction, \coq{from_many} implements the main body of the
+single-clause reduction, using the previous fresh variable \coq{carry},
+generating a new one \coq{xip1}, and passing it along. \coq{Fresh} is a simple
+state monad, where the action \coq{fresh} increments the current state and
+returns the old state. (We use a monad notation like Haskell's do-notation.)
+\coq{clause_to_three} wraps \coq{from_many} with the special cases of $\leq 3$
+literals in the top-level clause, then \coq{cnf_to_three''} calls
+\coq{clause_to_three} on each clause and concatenates the resulting clauses.
+Finally, \coq{cnf_to_three'} initializes the state monad with 1 + the highest
+variable name already in use and calls \coq{cnf_to_three''}.
+
+\begin{samepage}
+  \begin{minted}{coq}
+Fixpoint from_many (cl : clause) (carry : var) : Fresh (list clause) :=
+  match cl with
+  | [] | [_] => ret [] (* error case *)
+  | [akm1; ak] => ret [[NegLit carry; akm1; ak]]
+  | aip2 :: cl' => xip1 <- fresh ;;
+                 rest <- from_many cl' xip1 ;;
+                 ret ([NegLit carry; aip2; PosLit xip1] :: rest)
+  end.
+
+Definition clause_to_three (cl : clause) : Fresh (list clause) :=
+  match cl with
+  | [] => x <- fresh ;;
+         ret [ [PosLit x; PosLit x; PosLit x]; [NegLit x; NegLit x; NegLit x] ]
+  | [a] => x <- fresh ;;
+          y <- fresh ;;
+          ret [ [a; PosLit x; PosLit y]
+              ; [a; NegLit x; PosLit y]
+              ; [a; PosLit x; NegLit y]
+              ; [a; NegLit x; NegLit y]
+              ]
+  | [a; b] => x <- fresh ;;
+             ret [ [a; b; PosLit x]
+                 ; [a; b; NegLit x]
+                 ]
+  | [a; b; c] => ret [ [a; b; c] ]
+  | a :: b :: cl' => x1 <- fresh ;;
+                  many <- from_many cl' x1 ;;
+                  ret ([a; b; PosLit x1] :: many)
+  end.
+
+Fixpoint cnf_to_three'' (f : cnf_formula) : Fresh cnf_formula :=
+  match f with
+  | nil => ret nil
+  | cl :: f' => cl' <- clause_to_three cl ;;
+              f'' <- cnf_to_three'' f' ;;
+              ret (cl' ++ f'')
+  end.
+
+Definition cnf_to_three' (f : cnf_formula) : cnf_formula :=
+  snd (cnf_to_three'' f (cnf_max_var f + 1)).
+  \end{minted}
+\end{samepage}
+
+Now here's the statement of correctness for \coq{from_many}: assuming the current state value is greater than the maximum variable in the clause and the carry variable, and the length of the clause is at least 2, then:
+\begin{itemize}
+\item the new state variable is at least the old state variable
+\item the new state variable is is greater than all variables that appear in the
+  output clauses $f'$
+\item all the clauses in $f'$ have length 3
+\item for all assignments $a$ where the carry is assigned true, there exists
+  another assignment $a'$ that has the same values on all variables below the
+  old fresh variable state but has the same truth value on $f'$ as $a$ has on
+  the original clause.
+\item for all assignments $a$ where the carry is assigned false, there exists
+  another assignment $a'$ that has the same values on all variables below the
+  old fresh variable state but guarantees that $f'$ is true.
+\item for all assignments $a$ where the carry is assigned true, if $f'$ is
+  satisfied by $a$, then $cl$ is also satisfied by $a$.
+\end{itemize}
+\begin{samepage}
+  \begin{minted}{coq}
+Lemma from_many_correct : forall cl carry n,
+    n > clause_max_var cl ->
+    n > carry ->
+    (length cl >= 2)%nat ->
+    let (n', f') := from_many cl carry n in
+    n' >= n /\
+    n' > cnf_max_var f' /\
+    Forall (fun cl' => length cl' = 3%nat) f' /\
+    (forall a,
+        a carry = true ->
+        exists a',
+          (forall v, v < n -> a v = a' v) /\
+          satisfies_clause a cl = satisfies_cnf_formula a' f') /\
+    (forall a,
+        a carry = false ->
+        exists a',
+          (forall v, v < n -> a v = a' v) /\
+          satisfies_cnf_formula a' f' = true) /\
+    (forall a,
+        a carry = true ->
+        satisfies_cnf_formula a f' = true ->
+        satisfies_clause a cl = true).
+  \end{minted}
+\end{samepage}
+
+The proof proceeds by structural induction on the clause (or, equivalently, on
+normal induction on the length of the clause). The hard part is formulating this
+particular induction hypothesis, but even proving it is still anything but
+trivial: the proof is about 200 lines long, some of which could surely be
+cleaned up, but not by a ton. The whole proof script is available in the
+appendix, but it relies on several other lemmas like the fact that
+\coq{satisfies_clause a cl = satisfies_clause a' cl} if \coq{a} and \coq{a'}
+agree on all the variables used in \coq{cl}.
+
+From here, we prove specifications for each of the functions that build on top
+of \coq{same_many}, but they are somewhat more natural. We list them here:
+
+\begin{minted}{coq}
+Lemma cnf_to_three''_correct : forall f n,
+    n > cnf_max_var f ->
+    let (n', f') := cnf_to_three'' f n in
+    Forall (fun cl' => length cl' = 3%nat) f' /\
+    (forall a, exists a',
+          (forall v, v < n -> a v = a' v) /\
+          satisfies_cnf_formula a f = satisfies_cnf_formula a' f') /\
+    (forall a, satisfies_cnf_formula a f' = true -> satisfies_cnf_formula a f = true).
+Proof.
+  (* ... *)
+Qed.
+Lemma cnf_to_three'_correct : forall f,
+    Forall (fun cl' => length cl' = 3%nat) (cnf_to_three' f) /\
+    (cnf_satisfiable f <-> cnf_satisfiable (cnf_to_three' f)).
+Proof.
+  (* ... *)
+Qed.
+\end{minted}
+
+Then we finish up the proof by appealing to our previous lemmas:
+
+\begin{minted}{coq}
+Definition cnf_to_three (f : cnf_formula) : threecnf_formula.
+  exists (cnf_to_three' f).
+  apply cnf_to_three'_correct.
+Defined.
+
+Corollary cnf_to_three_correct : forall f,
+    (@ProblemYes _ CNFSAT f <-> @ProblemYes _ ThreeSAT (cnf_to_three f)).
+Proof.
+  intros.
+  apply cnf_to_three'_correct.
+Qed.
+
+Theorem three_sat_is_np_hard : np_hard ThreeSAT.
+Proof.
+  apply (np_hard_reduction CNFSAT) with (f := cnf_to_three).
+  { apply cnf_sat_is_np_hard. }
+  { auto using cnf_to_three_correct. }
+Qed.
+\end{minted}
+
+\section{Conclusion}
+
+It's a lot of work to even just prove correctness for some of the most simple
+reductions that Karp gives. However, our work does show that it is at least
+possible! With more work, we might be able to figure out patterns of proof that
+simplify the process -- for example, the proof of FORMULA-SAT to CNF-SAT didn't
+factor out the \coq{Fresh} monad; having that syntax made the reduction somewhat
+clearer.
+
+In the future, we hope to incorporate some type of polytimeness condition into
+our reductions. We also hope to write more proofs of Karps' original reductions.
 
 \printbibliography
+
+\appendix
+\section{\coq{same_many} Proof}
+
+\begin{minted}{coq}
+Lemma from_many_correct : forall cl carry n,
+    n > clause_max_var cl ->
+    n > carry ->
+    (length cl >= 2)%nat ->
+    let (n', f') := from_many cl carry n in
+    n' >= n /\
+    n' > cnf_max_var f' /\
+    Forall (fun cl' => length cl' = 3%nat) f' /\
+    (forall a,
+        a carry = true ->
+        exists a',
+          (forall v, v < n -> a v = a' v) /\
+          satisfies_clause a cl = satisfies_cnf_formula a' f') /\
+    (forall a,
+        a carry = false ->
+        exists a',
+          (forall v, v < n -> a v = a' v) /\
+          satisfies_cnf_formula a' f' = true) /\
+    (forall a,
+        a carry = true ->
+        satisfies_cnf_formula a f' = true ->
+        satisfies_clause a cl = true).
+Proof.
+  induction cl; intros; [| destruct cl]; [| | destruct cl].
+  - destruct from_many; cbn in *; lia.
+  - destruct from_many; cbn in *; lia.
+  - cbn in *.
+    destruct a, l; cbn in *;
+      (intuition;
+       try lia;
+       [ exists a; intuition; cbn; rewrite H2; btauto
+       | exists a; intuition; rewrite H2; btauto
+       | cbn in *; rewrite H2 in *; bool_simpl in *; auto]).
+  - cbv delta [from_many].
+    cbv iota.
+    fold from_many.
+    cbv beta iota.
+    remember (l :: l0 :: cl) as cl'.
+    cbn.
+    specialize (IHcl n (n + 1)).
+    destruct from_many.
+    cbn in *.
+    assert (n > clause_max_var cl') by (destruct a; cbn in *; lia).
+    match type of IHcl with
+    | _ -> _ -> _ -> ?A =>
+      assert A as IH by (apply IHcl; [| | rewrite Heqcl'; cbn; auto]; lia)
+    end.
+    destruct IH as (?&?&?&?&?).
+    intuition; [| destruct a | | |]; try lia.
+    + destruct (satisfies_literal a0 a) eqn:?.
+      * set (a' := (fun v => if N.eq_dec v n then false else a0 v)).
+        destruct (H8 a') as (a'' &?&?); [subst a'; cbn; destruct N.eq_dec; congruence |].
+        assert (forall v, v < n -> a0 v = a'' v) as Ha. {
+          intros.
+          transitivity (a' v); [| apply H10; lia].
+          subst a'; cbn.
+          destruct N.eq_dec; lia || auto.
+        }
+        exists a''; intuition.
+        rewrite satisfies_literal_subst with (a' := a'') in Heqb
+                by (destruct a; cbn in *; apply Ha; lia).
+        rewrite H11, Heqb.
+        btauto.
+      * set (a' := (fun v => if N.eq_dec v n then true else a0 v)).
+        destruct (H6 a') as (a'' &?&?); [subst a'; cbn; destruct N.eq_dec; congruence |].
+        assert (forall v, v < n -> a0 v = a'' v) as Ha. {
+          intros.
+          transitivity (a' v); [| apply H10; lia].
+          subst a'; cbn.
+          destruct N.eq_dec; lia || auto.
+        }
+        exists a''; intuition.
+        rewrite satisfies_clause_subst with (a' := a')
+                by (intros; subst a'; cbn; destruct N.eq_dec; lia || auto).
+        rewrite H11.
+        replace (a'' n) with true.
+        2: {
+          transitivity (a' n).
+          { subst a'; cbn.
+            destruct N.eq_dec; congruence.
+          }
+          { apply H10; lia. }
+        }
+        btauto.
+    + set (a' := fun v => if v <? n then a0 v else false).
+      destruct (H8 a') as (a'' &?&?);
+        [subst a'; cbn; destruct (N.ltb_spec0 n n); lia || auto |].
+      assert (forall v, v < n -> a0 v = a'' v) as Ha. {
+        intros.
+        transitivity (a' v); [| apply H10; lia].
+        subst a'; cbn.
+        destruct (N.ltb_spec0 v n); lia || auto.
+      }
+      exists a''; intuition.
+      rewrite H11, <-(Ha carry), H7; [| lia].
+      btauto.
+    + rewrite H7 in *.
+      bool_simpl in *.
+      apply andb_prop in H10; intuition.
+      apply orb_prop in H11; intuition.
+Qed.
+\end{minted} 
 
 \end{document}
